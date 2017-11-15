@@ -1,0 +1,68 @@
+#! /bin/bash
+pushd `dirname $0` > /dev/null
+BAYMAX_PATH=$(dirname `pwd`)
+popd > /dev/null
+OP_DIR=$1
+cd $OP_DIR
+echo '[+] Generating new report in '$OP_DIR
+rm -rf report
+mkdir -p report/build report/dist/loot
+REPORT_MD=report/dist/final-exercise-report.md
+REPORT_HTML=report/dist/final-exercise-report.html
+
+echo '[+] Copying Templates'
+cp $BAYMAX_PATH/report/*.md report/build
+
+if [ -f scope_ips ]; then
+  echo '[+] Getting Scope'
+  echo > report/build/03_01_scope.md
+  cat scope_ips | sed 's/^/- /g' >> report/build/03_01_scope.md
+  echo >> report/build/03_01_scope.md
+fi
+
+cp docs/*.md report/build/
+
+if [ -d hosts ]; then
+  for host in ./hosts/*; do
+    echo >> report/build/03_03_host_service_summary.md
+    echo "<article>" >> report/build/03_03_host_service_summary.md
+
+    echo >> report/build/03_03_host_service_summary.md
+    echo "#### $(basename $host) [$(cat $host/hostname)]" >> report/build/03_03_host_service_summary.md
+    echo >> report/build/03_03_host_service_summary.md
+    grep -P "^[0-9]+/tcp" $host/recon/*.nmap | awk '{print $1,$3,$4}' | sort -u | sed 's/^/- /g' >> report/build/03_03_host_service_summary.md
+    echo "</article>" >> report/build/03_03_host_service_summary.md
+    echo >> report/build/03_03_host_service_summary.md
+
+    if [ -f $host/README.md ]; then
+      echo >> report/build/04_99_hosts.md
+      echo "<article>" >> report/build/04_99_hosts.md
+      echo >> report/build/04_99_hosts.md
+      cat $host/README.md >> report/build/04_99_hosts.md
+      echo >> report/build/04_99_hosts.md
+      echo "</article>" >> report/build/04_99_hosts.md
+      echo >> report/build/04_99_hosts.md
+      echo '<div class="print-page-break"></div>' >> report/build/04_99_hosts.md
+      echo >> report/build/04_99_hosts.md
+    fi
+
+    cp $host/loot/*.png report/dist/loot/
+  done
+fi
+
+
+echo "Generated $(date)" >> report/build/99_99_lastpage.md
+echo '[+] Generating Markdown'
+cat report/build/* > $REPORT_MD
+echo '[+] Generating HTML'
+#/usr/share/doc/ruby-github-markdown/examples/gfm $REPORT_MD > $REPORT_HTML
+cat $BAYMAX_PATH/report/report-header.html > $REPORT_HTML
+# markdown-toc --maxdepth 3 --no-striHeadingTags -i $REPORT_MD
+github-markup $REPORT_MD >> $REPORT_HTML
+
+cat $BAYMAX_PATH/report/report-footer.html >> $REPORT_HTML
+echo '[+] Done'
+echo '[!] Open firefox and print to pdf :D'
+firefox $REPORT_HTML
+
+cd -
